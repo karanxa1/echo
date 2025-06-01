@@ -43,6 +43,9 @@ class Replica(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
+    # Relationships
+    user = relationship("User", back_populates="replicas")
+    
     def __repr__(self):
         return f"<Replica(id={self.id}, name='{self.name}', relationship='{self.relationship_type}', status='{self.status}')>"
 
@@ -60,6 +63,11 @@ class Conversation(Base):
     # Timestamps
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     last_message_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="conversations")
+    replica = relationship("Replica")
+    messages = relationship("Message", back_populates="conversation")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -81,10 +89,6 @@ class Message(Base):
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-# Define relationships
-Replica.user = relationship("User", back_populates="replicas")
-Conversation.user = relationship("User", back_populates="conversations")
-Conversation.replica = relationship("Replica")
-Conversation.messages = relationship("Message", back_populates="conversation")
-Message.conversation = relationship("Conversation", back_populates="messages") 
+    
+    # Relationships
+    conversation = relationship("Conversation", back_populates="messages") 

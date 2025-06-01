@@ -9,7 +9,7 @@ class AdvancedAIService:
     """Advanced AI service offering multiple specialized AI assistants for ECHO."""
     
     def __init__(self):
-        openai.api_key = settings.openai_api_key
+        openai.api_key = settings.OPENAI_API_KEY
         
         # Available AI Services
         self.ai_services = {

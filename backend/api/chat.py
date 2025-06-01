@@ -9,6 +9,7 @@ from models.replica import Conversation, Message
 from api.auth import get_current_active_user
 from services.ai_service import ai_service
 from services.advanced_ai_service import advanced_ai_service
+from services.free_ai_service import free_ai_service
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -413,3 +414,160 @@ async def get_chat_stats(
             "ai": ai_messages
         }
     }
+
+# === FREE AI ENDPOINTS ===
+
+class FreeAIChatMessage(BaseModel):
+    message: str
+    service_id: str = "memory_companion"
+    provider: str = "gemini"  # gemini, groq, ollama, huggingface
+    conversation_id: Optional[int] = None
+
+@router.get("/free-ai/providers")
+async def get_free_ai_providers(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get available free AI providers."""
+    return free_ai_service.get_available_providers()
+
+@router.post("/free-ai/test")
+async def test_free_ai_providers(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Test which free AI providers are working."""
+    return free_ai_service.test_providers()
+
+@router.get("/free-ai/status")
+async def get_free_ai_status(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get detailed status of all AI providers including fallback info."""
+    return free_ai_service.get_provider_status()
+
+@router.post("/free-ai/chat-smart")
+async def chat_with_smart_fallback(
+    chat: FreeAIChatMessage,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Smart chat that automatically selects the best available provider."""
+    
+    # Auto-select best provider if none specified or if specified provider is unavailable
+    provider_status = free_ai_service.get_provider_status()
+    available_providers = [p for p, status in provider_status.items() if status["available"]]
+    
+    if not chat.provider or chat.provider not in available_providers:
+        # Auto-select best available provider
+        if "gemini" in available_providers:
+            chat.provider = "gemini"
+        elif "groq" in available_providers:
+            chat.provider = "groq"
+        elif available_providers:
+            chat.provider = available_providers[0]
+        else:
+            return ChatResponse(
+                response="No AI providers are currently available. Please try again later.",
+                conversation_id=chat.conversation_id or 0,
+                error="No providers available"
+            )
+    
+    # Use the regular fallback chat endpoint
+    return await chat_with_free_ai(chat, current_user, db)
+
+@router.post("/free-ai/chat", response_model=ChatResponse)
+async def chat_with_free_ai(
+    chat: FreeAIChatMessage,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Chat using free AI providers with automatic fallback (Gemini ↔ Groq)."""
+    
+    try:
+        # Get user context
+        user_context = {
+            "name": current_user.full_name or current_user.username,
+            "username": current_user.username,
+            "user_id": current_user.id
+        }
+        
+        # Get conversation history if conversation_id provided
+        conversation_history = []
+        if chat.conversation_id:
+            messages = db.query(Message).filter(
+                Message.conversation_id == chat.conversation_id
+            ).order_by(Message.created_at.desc()).limit(8).all()  # Increased context
+            
+            for msg in reversed(messages):
+                role = "user" if msg.message_type == "user" else "assistant"
+                conversation_history.append({"role": role, "content": msg.content})
+        
+        # Use the enhanced fallback system
+        result = free_ai_service.chat_with_fallback(
+            service_id=chat.service_id,
+            user_message=chat.message,
+            preferred_provider=chat.provider,
+            user_context=user_context,
+            conversation_history=conversation_history
+        )
+        
+        if not result.get("success"):
+            return ChatResponse(
+                response="I apologize, but all AI providers are currently unavailable. Please try again in a moment.",
+                conversation_id=chat.conversation_id or 0,
+                error=result.get("error")
+            )
+        
+        # Create or get conversation
+        conversation = None
+        if chat.conversation_id:
+            conversation = db.query(Conversation).filter(
+                Conversation.id == chat.conversation_id,
+                Conversation.user_id == current_user.id
+            ).first()
+        else:
+            # Create new conversation with provider info
+            provider_name = result["provider"]
+            conversation = Conversation(
+                user_id=current_user.id,
+                conversation_type="free_ai",
+                title=f"AI Chat ({provider_name}) - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+        
+        # Save messages
+        user_msg = Message(
+            conversation_id=conversation.id,
+            content=chat.message,
+            message_type="user"
+        )
+        db.add(user_msg)
+        
+        # Include fallback info in the AI message if applicable
+        ai_content = result["response"]
+        if result.get("fallback_used"):
+            fallback_note = f"\n\n*Note: Switched from {result['original_provider']} to {result['fallback_provider']} to ensure uninterrupted service.*"
+            ai_content += fallback_note
+        
+        ai_msg = Message(
+            conversation_id=conversation.id,
+            content=ai_content,
+            message_type="ai",
+            model_used=result["provider"]
+        )
+        db.add(ai_msg)
+        
+        # Update conversation timestamp
+        conversation.last_message_at = datetime.utcnow()
+        db.commit()
+        
+        return ChatResponse(
+            response=result["response"],
+            conversation_id=conversation.id,
+            replica_name=result["provider"],
+            tokens_used=result.get("conversation_length", 0)  # Return context length
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Free AI chat error: {str(e)}")

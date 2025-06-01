@@ -13,13 +13,17 @@ class Settings:
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
     
+    # AI API settings
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+    HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
+    
     # Lowercase aliases for compatibility
     secret_key = SECRET_KEY
     algorithm = ALGORITHM
     access_token_expire_minutes = ACCESS_TOKEN_EXPIRE_MINUTES
-    
-    # OpenAI settings
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    openai_api_key = OPENAI_API_KEY
     
     # Application settings
     DEBUG: bool = os.getenv("DEBUG", "True").lower() == "true"

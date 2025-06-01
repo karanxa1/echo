@@ -218,6 +218,47 @@ class ApiService {
     });
   }
 
+  // Free AI with Fallback endpoints
+  async getFreeAIProviders() {
+    return this.get('/chat/free-ai/providers');
+  }
+
+  async getFreeAIStatus() {
+    return this.get('/chat/free-ai/status');
+  }
+
+  async testFreeAIProviders() {
+    return this.post('/chat/free-ai/test');
+  }
+
+  async chatWithFreeAI(
+    message: string, 
+    provider: string = 'gemini', 
+    serviceId: string = 'memory_companion',
+    conversationId?: number
+  ) {
+    return this.post('/chat/free-ai/chat', {
+      message,
+      provider,
+      service_id: serviceId,
+      conversation_id: conversationId
+    });
+  }
+
+  async chatWithSmartFallback(
+    message: string, 
+    serviceId: string = 'memory_companion',
+    conversationId?: number,
+    preferredProvider?: string
+  ) {
+    return this.post('/chat/free-ai/chat-smart', {
+      message,
+      provider: preferredProvider,
+      service_id: serviceId,
+      conversation_id: conversationId
+    });
+  }
+
   // Stats endpoints
   async getMemoryStats() {
     return this.get('/memories/stats/overview');
