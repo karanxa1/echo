@@ -7,6 +7,7 @@ from models.user import User
 from models.replica import Conversation, Message
 from api.auth import get_current_active_user
 from services.ai_service import ai_service
+from services.advanced_ai_service import advanced_ai_service
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 

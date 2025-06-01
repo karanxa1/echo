@@ -51,8 +51,17 @@ def get_password_hash(password: str) -> str:
 def get_user(db: Session, username: str) -> Optional[User]:
     return db.query(User).filter(User.username == username).first()
 
-def authenticate_user(db: Session, username: str, password: str) -> Optional[User]:
-    user = get_user(db, username)
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    return db.query(User).filter(User.email == email).first()
+
+def authenticate_user(db: Session, username_or_email: str, password: str) -> Optional[User]:
+    # Try to find user by username first
+    user = get_user(db, username_or_email)
+    
+    # If not found by username, try by email
+    if not user and "@" in username_or_email:
+        user = get_user_by_email(db, username_or_email)
+    
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -132,7 +141,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect username/email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)

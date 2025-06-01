@@ -19,14 +19,14 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // For login, the backend expects username field, but we'll use email as username
+      // The backend now accepts both email and username
       await apiService.login({
-        username: formData.email,
+        username: formData.email, // Can be email or username
         password: formData.password,
       });
 
       toast.success('Login successful!');
-      router.push('/dashboard'); // Redirect to dashboard or home page
+      router.push('/chat'); // Redirect to chat page
     } catch (error: any) {
       toast.error(error.message || 'Login failed. Please try again.');
     } finally {
@@ -62,7 +62,7 @@ export default function LoginPage() {
             {/* Email Field */}
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-semibold text-gray-700">
-                Email Address
+                Email or Username
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -75,7 +75,7 @@ export default function LoginPage() {
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="input-field pl-12 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Enter your email"
+                  placeholder="Enter your email or username"
                 />
               </div>
             </div>
