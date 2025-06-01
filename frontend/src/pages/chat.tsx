@@ -4,6 +4,7 @@ import { Send, Mic, MicOff, LogOut, User, Bot, Sparkles } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { User as UserType } from '../services/api';
 import ChatBackgroundVideo from '../components/ChatBackgroundVideo';
+import AIServiceSelector from '../components/AIServiceSelector';
 import toast from 'react-hot-toast';
 
 interface Message {
@@ -21,6 +22,8 @@ export default function ChatPage() {
   const [inputMessage, setInputMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [selectedAIService, setSelectedAIService] = useState('memory_companion');
+  const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,7 +42,7 @@ export default function ChatPage() {
         setMessages([
           {
             id: '1',
-            content: `Hello ${userData.full_name?.split(' ')[0] || userData.username}! I'm ECHO AI, ready to help you explore your memories and thoughts. What would you like to talk about today?`,
+            content: `Hello ${userData.full_name?.split(' ')[0] || userData.username}! I'm your Memory Companion, ready to help you explore your memories and thoughts. Choose any AI assistant from the sidebar to get started, or ask me anything about your life experiences.`,
             type: 'ai',
             timestamp: new Date(),
           },
@@ -78,8 +81,17 @@ export default function ChatPage() {
     setIsSending(true);
 
     try {
-      // Call the chat API
-      const response = await apiService.chatWithSelf(userMessage.content);
+      // Use the advanced AI service
+      const response = await apiService.chatWithAIService(
+        selectedAIService, 
+        userMessage.content, 
+        currentConversationId || undefined
+      );
+      
+      // Update conversation ID for future messages
+      if (response.data.conversation_id && !currentConversationId) {
+        setCurrentConversationId(response.data.conversation_id);
+      }
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -92,16 +104,16 @@ export default function ChatPage() {
     } catch (error: any) {
       console.error('Chat error:', error);
       
-      // Fallback AI response for demo purposes
+      // Fallback AI response
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I understand what you're sharing. While I'm still learning about your memories, I'm here to listen and help you reflect on your experiences. Could you tell me more about what's on your mind?",
+        content: "I understand what you're sharing. While I'm processing your request, I'm here to listen and help you reflect on your experiences. Could you tell me more about what's on your mind?",
         type: 'ai',
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      toast.error('Chat service is currently limited. Using demo mode.');
+      toast.error('Using fallback response. AI service may be limited.');
     } finally {
       setIsSending(false);
     }
@@ -122,6 +134,26 @@ export default function ChatPage() {
   const toggleRecording = () => {
     setIsRecording(!isRecording);
     toast.info(isRecording ? 'Recording stopped' : 'Recording started');
+  };
+
+  const handleServiceChange = (serviceId: string) => {
+    setSelectedAIService(serviceId);
+    // Reset conversation when switching services
+    setCurrentConversationId(null);
+    
+    // Add a service switch message
+    const switchMessage: Message = {
+      id: Date.now().toString(),
+      content: `Switched to ${serviceId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}. How can I help you today?`,
+      type: 'ai',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, switchMessage]);
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInputMessage(suggestion);
+    inputRef.current?.focus();
   };
 
   if (isLoading) {
@@ -173,9 +205,20 @@ export default function ChatPage() {
       </header>
 
       {/* Main Chat Area */}
-      <main className="relative z-10 flex flex-col h-[calc(100vh-4rem)]">
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+      <main className="relative z-10 flex h-[calc(100vh-4rem)]">
+        {/* AI Service Sidebar */}
+        <div className="w-80 bg-black/10 backdrop-blur-sm border-r border-white/10 p-4 overflow-y-auto">
+          <AIServiceSelector
+            selectedService={selectedAIService}
+            onServiceChange={handleServiceChange}
+            onSuggestionClick={handleSuggestionClick}
+          />
+        </div>
+
+        {/* Chat Content */}
+        <div className="flex-1 flex flex-col">
+          {/* Messages Area */}
+          <div className="flex-1 overflow-y-auto px-4 py-6">
           <div className="max-w-4xl mx-auto space-y-6">
             {messages.map((message) => (
               <div

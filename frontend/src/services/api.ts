@@ -194,6 +194,30 @@ class ApiService {
     });
   }
 
+  // Advanced AI Services
+  async getAIServices() {
+    return this.get('/chat/ai-services');
+  }
+
+  async chatWithAIService(serviceId: string, message: string, conversationId?: number) {
+    return this.post('/chat/ai-chat', {
+      service_id: serviceId,
+      message,
+      conversation_id: conversationId
+    });
+  }
+
+  async getAIServiceSuggestions(serviceId: string) {
+    return this.get(`/chat/ai-suggestions/${serviceId}`);
+  }
+
+  async getSmartSuggestions(message: string, recentTopics: string[] = []) {
+    return this.post('/chat/smart-suggestions', {
+      message,
+      recent_topics: recentTopics
+    });
+  }
+
   // Stats endpoints
   async getMemoryStats() {
     return this.get('/memories/stats/overview');

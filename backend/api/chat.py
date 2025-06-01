@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -42,6 +43,18 @@ class MessageResponse(BaseModel):
     type: str
     timestamp: str
     tokens_used: Optional[int] = None
+
+class AdvancedChatMessage(BaseModel):
+    message: str
+    service_id: str = "memory_companion"
+    conversation_id: Optional[int] = None
+
+class AIServiceResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    personality: str
+    capabilities: List[str]
 
 # API Endpoints
 @router.post("/self", response_model=ChatResponse)
@@ -227,6 +240,127 @@ async def get_chat_suggestions(
             ]
     
     return {"suggestions": suggestions}
+
+@router.get("/ai-services", response_model=List[AIServiceResponse])
+async def get_ai_services(
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get all available AI services."""
+    return advanced_ai_service.get_available_ai_services()
+
+@router.post("/ai-chat", response_model=ChatResponse)
+async def chat_with_ai_service(
+    chat: AdvancedChatMessage,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Chat with a specialized AI service."""
+    
+    try:
+        # Get user context
+        user_context = {
+            "name": current_user.full_name or current_user.username,
+            "username": current_user.username,
+            "user_id": current_user.id
+        }
+        
+        # Get conversation history if conversation_id provided
+        conversation_history = []
+        if chat.conversation_id:
+            messages = db.query(Message).filter(
+                Message.conversation_id == chat.conversation_id
+            ).order_by(Message.created_at.desc()).limit(6).all()
+            
+            for msg in reversed(messages):
+                role = "user" if msg.message_type == "user" else "assistant"
+                conversation_history.append({"role": role, "content": msg.content})
+        
+        # Get AI response
+        result = advanced_ai_service.chat_with_ai_service(
+            service_id=chat.service_id,
+            user_message=chat.message,
+            user_context=user_context,
+            conversation_history=conversation_history
+        )
+        
+        if not result.get("success"):
+            return ChatResponse(
+                response="I'm sorry, but I'm having trouble responding right now. Please try again in a moment.",
+                conversation_id=chat.conversation_id or 0,
+                error=result.get("error")
+            )
+        
+        # Create or get conversation for advanced AI services
+        conversation = None
+        if chat.conversation_id:
+            conversation = db.query(Conversation).filter(
+                Conversation.id == chat.conversation_id,
+                Conversation.user_id == current_user.id
+            ).first()
+        else:
+            # Create new conversation
+            conversation = Conversation(
+                user_id=current_user.id,
+                conversation_type="ai_service",
+                title=f"Chat with {result['service_name']} - {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            )
+            db.add(conversation)
+            db.commit()
+            db.refresh(conversation)
+        
+        # Save messages
+        user_msg = Message(
+            conversation_id=conversation.id,
+            content=chat.message,
+            message_type="user"
+        )
+        db.add(user_msg)
+        
+        ai_msg = Message(
+            conversation_id=conversation.id,
+            content=result["response"],
+            message_type="ai",
+            tokens_used=result.get("tokens_used"),
+            model_used="gpt-4"
+        )
+        db.add(ai_msg)
+        
+        # Update conversation timestamp
+        conversation.last_message_at = datetime.utcnow()
+        db.commit()
+        
+        return ChatResponse(
+            response=result["response"],
+            conversation_id=conversation.id,
+            tokens_used=result.get("tokens_used"),
+            replica_name=result["service_name"]
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
+
+@router.get("/ai-suggestions/{service_id}")
+async def get_ai_service_suggestions(
+    service_id: str,
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get conversation starters for a specific AI service."""
+    
+    suggestions = advanced_ai_service.get_service_suggestions(service_id)
+    return {"service_id": service_id, "suggestions": suggestions}
+
+@router.post("/smart-suggestions")
+async def get_smart_suggestions(
+    data: dict,  # {"message": "user message", "recent_topics": []}
+    current_user: User = Depends(get_current_active_user)
+):
+    """Get smart AI service suggestions based on user message."""
+    
+    user_message = data.get("message", "")
+    recent_topics = data.get("recent_topics", [])
+    
+    suggestions = advanced_ai_service.get_smart_suggestions(user_message, recent_topics)
+    return {"message": user_message, "suggested_services": suggestions}
 
 @router.get("/stats")
 async def get_chat_stats(
