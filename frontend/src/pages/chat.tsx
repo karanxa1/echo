@@ -271,41 +271,42 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* Input Area */}
-        <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-end space-x-4">
-              <div className="flex-1 relative">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Share your thoughts, memories, or ask me anything..."
-                  className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent resize-none"
-                  disabled={isSending}
-                />
+          {/* Input Area */}
+          <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-end space-x-4">
+                <div className="flex-1 relative">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Share your thoughts, memories, or ask me anything..."
+                    className="w-full bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent resize-none"
+                    disabled={isSending}
+                  />
+                </div>
+                
+                <button
+                  onClick={toggleRecording}
+                  className={`p-3 rounded-xl transition-all duration-200 ${
+                    isRecording
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                  }`}
+                >
+                  {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </button>
+                
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!inputMessage.trim() || isSending}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <Send className="h-5 w-5" />
+                </button>
               </div>
-              
-              <button
-                onClick={toggleRecording}
-                className={`p-3 rounded-xl transition-all duration-200 ${
-                  isRecording
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                }`}
-              >
-                {isRecording ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-              </button>
-              
-              <button
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || isSending}
-                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-              >
-                <Send className="h-5 w-5" />
-              </button>
             </div>
           </div>
         </div>
